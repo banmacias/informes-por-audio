@@ -132,6 +132,28 @@ export const api = {
   deleteTemplate: (id: number) =>
     request<{ ok: boolean }>(`/api/templates/${id}`, { method: "DELETE" }),
 
+  extractPdf: async (file: File) => {
+    const authHeaders = await getAuthHeaders();
+    const form = new FormData();
+    form.append("file", file);
+    const res = await fetch(`${API_URL}/api/templates/extract-pdf`, {
+      method: "POST",
+      headers: authHeaders,
+      body: form,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || "Error al procesar el PDF");
+    }
+    return res.json() as Promise<{ text: string; filename: string }>;
+  },
+
+  extractFromDrive: (url: string, accessToken: string) =>
+    request<{ text: string; filename: string }>("/api/templates/from-drive", {
+      method: "POST",
+      body: JSON.stringify({ url, access_token: accessToken }),
+    }),
+
   // Reports
   generateReport: (sessionId: number, templateId?: number) =>
     request<Report>(`/api/reports/generate/${sessionId}`, {
