@@ -56,7 +56,22 @@ async def transcribe(session_id: int, language: str = Form("es"), user: CurrentU
         service_used="deepgram",
     )
 
+    updates = {}
     if result.get("duration"):
-        await update_session(session_id, audio_duration_seconds=result["duration"])
+        updates["audio_duration_seconds"] = result["duration"]
+
+    # Auto-extract title and patient name from transcript
+    try:
+        from extract_session_info import extract_session_info
+        info = await extract_session_info(result["text"], session_type=session["session_type"])
+        if info.get("title"):
+            updates["title"] = info["title"]
+        if info.get("patient_name"):
+            updates["patient_name"] = info["patient_name"]
+    except Exception:
+        pass  # Non-critical: keep placeholder title if extraction fails
+
+    if updates:
+        await update_session(session_id, **updates)
 
     return transcript

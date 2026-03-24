@@ -10,8 +10,6 @@ export default function RecordPage() {
   const { t } = useI18n();
   const router = useRouter();
 
-  const [title, setTitle] = useState("");
-  const [patientName, setPatientName] = useState("");
   const [sessionType, setSessionType] = useState<"parent_session" | "team_meeting">("parent_session");
   const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const [step, setStep] = useState<"setup" | "record" | "processing">("setup");
@@ -22,7 +20,6 @@ export default function RecordPage() {
   }, []);
 
   const handleStartRecording = () => {
-    if (!title.trim()) return;
     setStep("record");
   };
 
@@ -30,13 +27,23 @@ export default function RecordPage() {
     if (!audioBlob) return;
     setStep("processing");
 
+    // Generate a placeholder title with today's date
+    const today = new Date().toLocaleDateString("es-CL", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+    const placeholderTitle =
+      sessionType === "team_meeting"
+        ? `Reunión de equipo ${today}`
+        : `Sesión ${today}`;
+
     try {
       // 1. Create session
       setStatus("Creando sesión...");
       const session = await api.createSession({
-        title: title.trim(),
+        title: placeholderTitle,
         session_type: sessionType,
-        patient_name: patientName.trim() || undefined,
       });
 
       // 2. Upload audio
@@ -72,8 +79,9 @@ export default function RecordPage() {
   if (step === "record") {
     return (
       <div>
-        <h1 className="text-2xl font-bold mb-2">{title}</h1>
-        {patientName && <p className="text-gray-500 mb-6">{patientName}</p>}
+        <h1 className="text-2xl font-bold mb-6">
+          {sessionType === "team_meeting" ? t("record_type_team") : t("record_type_parent")}
+        </h1>
 
         <Recorder onRecordingComplete={handleRecordingComplete} />
 
@@ -121,31 +129,10 @@ export default function RecordPage() {
           </button>
         </div>
 
-        {/* Title */}
-        <input
-          type="text"
-          placeholder={t("record_session_title")}
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-        />
-
-        {/* Patient Name (only for parent sessions) */}
-        {sessionType === "parent_session" && (
-          <input
-            type="text"
-            placeholder={t("record_patient_name")}
-            value={patientName}
-            onChange={(e) => setPatientName(e.target.value)}
-            className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 outline-none transition-all"
-          />
-        )}
-
         {/* Start Button */}
         <button
           onClick={handleStartRecording}
-          disabled={!title.trim()}
-          className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-semibold py-4 px-6 rounded-xl transition-colors text-lg mt-4"
+          className="w-full bg-red-500 hover:bg-red-600 text-white font-semibold py-4 px-6 rounded-xl transition-colors text-lg mt-4"
         >
           {t("record_start")}
         </button>
