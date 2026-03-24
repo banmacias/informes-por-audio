@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { api, type Session, type Report } from "@/lib/api";
+import { api, type Session, type Report, type Template } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import ReportEditor from "@/components/ReportEditor";
 import ShareModal from "@/components/ShareModal";
@@ -19,6 +19,8 @@ export default function SessionDetail() {
   const [generating, setGenerating] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [activeTab, setActiveTab] = useState<"transcript" | "report">("report");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [selectedTemplateId, setSelectedTemplateId] = useState<number | undefined>(undefined);
 
   useEffect(() => {
     api
@@ -26,12 +28,17 @@ export default function SessionDetail() {
       .then(setSession)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false));
+    api.listTemplates().then((list) => {
+      setTemplates(list);
+      const def = list.find((t) => t.is_default === 1);
+      if (def) setSelectedTemplateId(def.id);
+    }).catch(() => {});
   }, [sessionId]);
 
   const handleGenerateReport = async () => {
     setGenerating(true);
     try {
-      await api.generateReport(sessionId);
+      await api.generateReport(sessionId, selectedTemplateId);
       const updated = await api.getSession(sessionId);
       setSession(updated);
     } catch (err) {
@@ -142,21 +149,43 @@ export default function SessionDetail() {
           {session.report ? (
             <ReportEditor report={session.report} onUpdate={handleReportUpdate} />
           ) : session.transcript ? (
-            <div className="text-center py-8">
-              <button
-                onClick={handleGenerateReport}
-                disabled={generating}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-4 px-8 rounded-xl transition-colors"
-              >
-                {generating ? (
-                  <span className="flex items-center gap-2">
-                    <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Generando...
-                  </span>
-                ) : (
-                  t("session_generate_report")
-                )}
-              </button>
+            <div className="py-8 space-y-4">
+              {templates.length > 0 && (
+                <div className="bg-white border border-gray-200 rounded-xl p-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    {t("template_selector_label")}
+                  </label>
+                  <select
+                    value={selectedTemplateId ?? ""}
+                    onChange={(e) => setSelectedTemplateId(e.target.value ? Number(e.target.value) : undefined)}
+                    className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <option value="">{t("template_selector_none")}</option>
+                    {templates.map((tmpl) => (
+                      <option key={tmpl.id} value={tmpl.id}>
+                        {tmpl.name}
+                        {tmpl.is_default === 1 ? " ★" : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <div className="text-center">
+                <button
+                  onClick={handleGenerateReport}
+                  disabled={generating}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-semibold py-4 px-8 rounded-xl transition-colors"
+                >
+                  {generating ? (
+                    <span className="flex items-center gap-2">
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Generando...
+                    </span>
+                  ) : (
+                    t("session_generate_report")
+                  )}
+                </button>
+              </div>
             </div>
           ) : (
             <p className="text-center text-gray-400 py-8">

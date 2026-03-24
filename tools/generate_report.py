@@ -79,6 +79,7 @@ async def generate_report(
     transcript: str,
     session_type: str = "parent_session",
     patient_name: str | None = None,
+    template_content: str | None = None,
 ) -> dict:
     """
     Generate a structured clinical report from a transcript.
@@ -87,6 +88,7 @@ async def generate_report(
         transcript: The full text transcript
         session_type: 'parent_session' or 'team_meeting'
         patient_name: Patient name (for parent sessions)
+        template_content: Custom template instructions (overrides built-in templates)
 
     Returns:
         dict with 'markdown' and 'html' keys
@@ -97,7 +99,13 @@ async def generate_report(
     from datetime import date
     today = date.today().strftime("%d/%m/%Y")
 
-    if session_type == "team_meeting":
+    if template_content:
+        # Use provided template, substituting known variables
+        system_prompt = template_content.format(
+            patient_name=patient_name or "(No especificado)",
+            date=today,
+        )
+    elif session_type == "team_meeting":
         system_prompt = TEAM_MEETING_TEMPLATE.format(date=today)
     else:
         system_prompt = PARENT_SESSION_TEMPLATE.format(

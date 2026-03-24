@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import Optional
-from ..database import get_session, save_report, update_report
+from ..database import get_session, save_report, update_report, get_template
 from ..auth import get_current_user, CurrentUser
 import os
 
@@ -15,13 +15,24 @@ class ReportUpdate(BaseModel):
     content_html: Optional[str] = None
 
 
+class GenerateRequest(BaseModel):
+    template_id: Optional[int] = None
+
+
 @router.post("/generate/{session_id}")
-async def generate(session_id: int, user: CurrentUser = Depends(get_current_user)):
+async def generate(session_id: int, body: GenerateRequest = GenerateRequest(), user: CurrentUser = Depends(get_current_user)):
     session = await get_session(session_id)
     if not session:
         raise HTTPException(404, "Session not found")
     if not session.get("transcript"):
         raise HTTPException(400, "No transcript available. Transcribe audio first.")
+
+    # Look up template content if template_id provided
+    template_content = None
+    if body.template_id:
+        template = await get_template(body.template_id)
+        if template:
+            template_content = template["content"]
 
     # Import and call the WAT tool
     import sys
@@ -33,6 +44,7 @@ async def generate(session_id: int, user: CurrentUser = Depends(get_current_user
             transcript=session["transcript"]["full_text"],
             session_type=session["session_type"],
             patient_name=session.get("patient_name"),
+            template_content=template_content,
         )
     except Exception as e:
         raise HTTPException(500, f"Report generation failed: {str(e)}")

@@ -67,6 +67,17 @@ export interface Report {
   updated_at: string;
 }
 
+export interface Template {
+  id: number;
+  name: string;
+  description: string | null;
+  session_type: "parent_session" | "team_meeting" | "any";
+  content: string;
+  is_default: number;
+  created_at: string;
+  updated_at: string;
+}
+
 export const api = {
   // Sessions
   listSessions: () => request<Session[]>("/api/sessions"),
@@ -109,9 +120,24 @@ export const api = {
     return res.json() as Promise<Transcript>;
   },
 
+  // Templates
+  listTemplates: () => request<Template[]>("/api/templates"),
+
+  createTemplate: (data: { name: string; content: string; session_type?: string; description?: string }) =>
+    request<Template>("/api/templates", { method: "POST", body: JSON.stringify(data) }),
+
+  updateTemplate: (id: number, data: Partial<{ name: string; content: string; session_type: string; description: string }>) =>
+    request<Template>(`/api/templates/${id}`, { method: "PUT", body: JSON.stringify(data) }),
+
+  deleteTemplate: (id: number) =>
+    request<{ ok: boolean }>(`/api/templates/${id}`, { method: "DELETE" }),
+
   // Reports
-  generateReport: (sessionId: number) =>
-    request<Report>(`/api/reports/generate/${sessionId}`, { method: "POST" }),
+  generateReport: (sessionId: number, templateId?: number) =>
+    request<Report>(`/api/reports/generate/${sessionId}`, {
+      method: "POST",
+      body: JSON.stringify({ template_id: templateId ?? null }),
+    }),
 
   updateReport: (reportId: number, content_markdown: string, content_html?: string) =>
     request<Report>(`/api/reports/${reportId}`, {

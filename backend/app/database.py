@@ -6,7 +6,56 @@ from .config import settings
 
 DB_PATH = settings.DB_PATH
 
+AYOOK_TEMPLATE = """Eres una asistente de documentación clínica para el Centro Ayook de Lenguaje, Habla y Aprendizaje.
+Genera un informe clínico formal en español a partir de la transcripción, siguiendo exactamente esta estructura:
+
+---
+
+**PACIENTE:** {patient_name}
+**FECHA:** {date}
+**EDAD CRONOLÓGICA:** (extrae de la transcripción o deja en blanco)
+**DX:** (extrae el diagnóstico de la transcripción o deja en blanco)
+
+(Párrafo de apertura: motivo de consulta, breve descripción del caso y por qué asiste al centro)
+
+**Dificultades identificadas:**
+- (lista de dificultades concretas observadas o reportadas)
+
+**Plan de Intervención:**
+❖ (objetivos e intervenciones planificadas)
+
+(Párrafo de progreso actual: descripción narrativa del avance del paciente en las áreas trabajadas)
+
+**Conclusión:**
+(párrafo de conclusión clínica)
+
+**Recomendaciones:**
+- (lista de recomendaciones para casa o seguimiento)
+
+---
+Lic. Fernanda Cárdenas Trigo
+Cédula Profesional 12852000
+
+---
+Instrucciones:
+- Usa lenguaje clínico formal
+- Si la información no está en la transcripción, omite el campo en lugar de inventar
+- Mantén un tono profesional y objetivo
+- Las viñetas de dificultades deben ser concretas y observables
+- El Plan de Intervención debe usar el símbolo ❖ como viñeta"""
+
 SCHEMA = """
+CREATE TABLE IF NOT EXISTS templates (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    description TEXT,
+    session_type TEXT NOT NULL CHECK(session_type IN ('parent_session', 'team_meeting', 'any')),
+    content TEXT NOT NULL,
+    is_default INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE TABLE IF NOT EXISTS sessions (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     title TEXT NOT NULL,
@@ -54,6 +103,76 @@ async def init_db():
     try:
         await db.executescript(SCHEMA)
         await db.commit()
+        # Seed default Ayook template if no templates exist
+        row = await (await db.execute("SELECT COUNT(*) as n FROM templates")).fetchone()
+        if row["n"] == 0:
+            await db.execute(
+                "INSERT INTO templates (name, description, session_type, content, is_default) VALUES (?, ?, ?, ?, 1)",
+                (
+                    "Informe Ayook",
+                    "Plantilla oficial del Centro Ayook de Lenguaje, Habla y Aprendizaje",
+                    "parent_session",
+                    AYOOK_TEMPLATE,
+                ),
+            )
+            await db.commit()
+    finally:
+        await db.close()
+
+
+# --- Template CRUD ---
+
+async def list_templates() -> list[dict]:
+    db = await get_db()
+    try:
+        rows = await (await db.execute("SELECT * FROM templates ORDER BY is_default DESC, name ASC")).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        await db.close()
+
+
+async def get_template(template_id: int) -> dict | None:
+    db = await get_db()
+    try:
+        row = await (await db.execute("SELECT * FROM templates WHERE id = ?", (template_id,))).fetchone()
+        return dict(row) if row else None
+    finally:
+        await db.close()
+
+
+async def create_template(name: str, content: str, session_type: str = "any", description: str | None = None) -> dict:
+    db = await get_db()
+    try:
+        cursor = await db.execute(
+            "INSERT INTO templates (name, description, session_type, content) VALUES (?, ?, ?, ?)",
+            (name, description, session_type, content),
+        )
+        await db.commit()
+        row = await (await db.execute("SELECT * FROM templates WHERE id = ?", (cursor.lastrowid,))).fetchone()
+        return dict(row)
+    finally:
+        await db.close()
+
+
+async def update_template(template_id: int, **kwargs) -> dict | None:
+    db = await get_db()
+    try:
+        kwargs["updated_at"] = "CURRENT_TIMESTAMP"
+        sets = ", ".join(f"{k} = {'CURRENT_TIMESTAMP' if v == 'CURRENT_TIMESTAMP' else '?'}" for k, v in kwargs.items())
+        values = [v for v in kwargs.values() if v != "CURRENT_TIMESTAMP"] + [template_id]
+        await db.execute(f"UPDATE templates SET {sets} WHERE id = ?", values)
+        await db.commit()
+        return await get_template(template_id)
+    finally:
+        await db.close()
+
+
+async def delete_template(template_id: int) -> bool:
+    db = await get_db()
+    try:
+        cursor = await db.execute("DELETE FROM templates WHERE id = ? AND is_default = 0", (template_id,))
+        await db.commit()
+        return cursor.rowcount > 0
     finally:
         await db.close()
 

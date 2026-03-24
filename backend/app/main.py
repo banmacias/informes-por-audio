@@ -3,7 +3,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .database import init_db
-from .routes import sessions, audio, reports, sharing
+from .routes import sessions, audio, reports, sharing, templates
 
 
 @asynccontextmanager
@@ -33,6 +33,7 @@ app.include_router(sessions.router)
 app.include_router(audio.router)
 app.include_router(reports.router)
 app.include_router(sharing.router)
+app.include_router(templates.router)
 
 
 @app.get("/api/health")
