@@ -37,7 +37,8 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         session.user.id = token.sub;
       }
       // Expose Google access token so Drive API calls can use it
-      (session as Record<string, unknown>).google_access_token =
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (session as unknown as Record<string, unknown>).google_access_token =
         token.google_access_token ?? null;
       return session;
     },
