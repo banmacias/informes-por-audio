@@ -19,11 +19,11 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS for Vercel frontend
+# CORS — allow all origins (requests are protected by API key)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.ALLOWED_ORIGINS,
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
