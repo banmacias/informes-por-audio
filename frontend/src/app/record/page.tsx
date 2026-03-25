@@ -59,8 +59,8 @@ export default function RecordPage() {
       setStatus("Generando informe...");
       await api.generateReport(session.id);
 
-      // 5. Navigate to session
-      router.push(`/session/${session.id}`);
+      // 5. Navigate to sessions list, highlighting the new session
+      router.push(`/?new=${session.id}`);
     } catch (err) {
       setStatus(`Error: ${err instanceof Error ? err.message : "Unknown error"}`);
       setStep("record");

@@ -16,7 +16,7 @@ const typeIcons: Record<string, string> = {
   team_meeting: "👥",
 };
 
-export default function SessionCard({ session }: { session: Session }) {
+export default function SessionCard({ session, isNew }: { session: Session; isNew?: boolean }) {
   const { t } = useI18n();
   const date = new Date(session.created_at).toLocaleDateString("es-CL", {
     day: "numeric",
@@ -27,7 +27,9 @@ export default function SessionCard({ session }: { session: Session }) {
 
   return (
     <Link href={`/session/${session.id}`}>
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+      <div className={`bg-white rounded-xl p-4 shadow-sm border transition-shadow hover:shadow-md ${
+        isNew ? "border-green-400 ring-2 ring-green-200" : "border-gray-100"
+      }`}>
         <div className="flex items-start justify-between">
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1">
@@ -46,9 +48,16 @@ export default function SessionCard({ session }: { session: Session }) {
               )}
             </p>
           </div>
-          <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[session.status]}`}>
-            {t(`status_${session.status}`)}
-          </span>
+          <div className="flex flex-col items-end gap-1 shrink-0">
+            {isNew && (
+              <span className="text-xs bg-green-500 text-white px-2 py-0.5 rounded-full font-medium">
+                Nueva
+              </span>
+            )}
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[session.status]}`}>
+              {t(`status_${session.status}`)}
+            </span>
+          </div>
         </div>
         {session.audio_duration_seconds && (
           <p className="text-xs text-gray-400 mt-2">
