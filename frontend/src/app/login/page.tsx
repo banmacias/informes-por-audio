@@ -18,6 +18,7 @@ function LoginContent() {
           <p className="text-gray-500 mt-2 text-sm">
             Plataforma de documentación clínica para terapeutas del lenguaje
           </p>
+          <p className="text-gray-300 mt-1 text-xs">v2026.03.25</p>
         </div>
 
         {/* Error message */}
