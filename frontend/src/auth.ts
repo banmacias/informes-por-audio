@@ -11,11 +11,6 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     Google({
       clientId: process.env.AUTH_GOOGLE_ID!,
       clientSecret: process.env.AUTH_GOOGLE_SECRET!,
-      authorization: {
-        params: {
-          scope: "openid email profile https://www.googleapis.com/auth/drive.readonly",
-        },
-      },
     }),
   ],
   callbacks: {
@@ -25,21 +20,10 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       const email = user.email?.toLowerCase() || "";
       return allowedEmails.includes(email);
     },
-    jwt({ token, account }) {
-      // Save Google access_token on initial sign-in
-      if (account?.access_token) {
-        token.google_access_token = account.access_token;
-      }
-      return token;
-    },
     session({ session, token }) {
       if (session.user && token.sub) {
         session.user.id = token.sub;
       }
-      // Expose Google access token so Drive API calls can use it
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (session as unknown as Record<string, unknown>).google_access_token =
-        token.google_access_token ?? null;
       return session;
     },
   },

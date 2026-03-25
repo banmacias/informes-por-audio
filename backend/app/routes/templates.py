@@ -103,56 +103,42 @@ async def extract_pdf(file: UploadFile = File(...), user: CurrentUser = Depends(
 
 class DriveRequest(BaseModel):
     url: str
-    access_token: str
 
 
 @router.post("/from-drive")
 async def from_drive(body: DriveRequest, user: CurrentUser = Depends(get_current_user)):
-    file_id = _extract_drive_file_id(body.url)
+    url = body.url.strip()
+    file_id = _extract_drive_file_id(url)
     if not file_id:
         raise HTTPException(400, "No se pudo extraer el ID del archivo de Google Drive")
 
-    headers = {"Authorization": f"Bearer {body.access_token}"}
+    # Determine if it's a Google Doc or a Drive file (PDF, etc.)
+    is_google_doc = "docs.google.com/document" in url
 
-    async with httpx.AsyncClient(timeout=30) as client:
-        # Get file metadata
-        meta = await client.get(
-            f"https://www.googleapis.com/drive/v3/files/{file_id}",
-            params={"fields": "mimeType,name"},
-            headers=headers,
-        )
-        if meta.status_code == 401:
-            raise HTTPException(401, "Sesión de Google expirada. Cierra sesión y vuelve a entrar.")
-        if meta.status_code != 200:
-            raise HTTPException(400, f"No se pudo acceder al archivo ({meta.status_code}). Verifica que el enlace sea correcto y que tengas acceso.")
-
-        info = meta.json()
-        mime = info.get("mimeType", "")
-        name = info.get("name", "")
-
-        if mime == "application/vnd.google-apps.document":
-            resp = await client.get(
-                f"https://www.googleapis.com/drive/v3/files/{file_id}/export",
-                params={"mimeType": "text/plain"},
-                headers=headers,
-            )
+    async with httpx.AsyncClient(timeout=30, follow_redirects=True) as client:
+        if is_google_doc:
+            # Google Docs export as plain text (works for files shared as "anyone with link")
+            export_url = f"https://docs.google.com/document/d/{file_id}/export?format=txt"
+            resp = await client.get(export_url)
+            if resp.status_code == 401 or resp.status_code == 403:
+                raise HTTPException(403, "El documento no es accesible. Asegúrate de que esté compartido como 'Cualquiera con el enlace puede ver'.")
             if resp.status_code != 200:
-                raise HTTPException(400, "No se pudo exportar el documento")
-            return {"text": resp.text.strip(), "filename": name}
-
-        elif mime == "application/pdf":
-            resp = await client.get(
-                f"https://www.googleapis.com/drive/v3/files/{file_id}",
-                params={"alt": "media"},
-                headers=headers,
-            )
-            if resp.status_code != 200:
-                raise HTTPException(400, "No se pudo descargar el PDF")
-            try:
-                text = _pdf_bytes_to_text(resp.content)
-            except Exception as e:
-                raise HTTPException(500, f"No se pudo leer el PDF: {e}")
-            return {"text": text, "filename": name}
-
+                raise HTTPException(400, f"No se pudo acceder al documento ({resp.status_code}).")
+            return {"text": resp.text.strip()}
         else:
-            raise HTTPException(400, "Solo se admiten Google Docs y PDFs de Drive")
+            # PDF or other file hosted in Drive
+            download_url = f"https://drive.google.com/uc?export=download&id={file_id}"
+            resp = await client.get(download_url)
+            if resp.status_code == 401 or resp.status_code == 403:
+                raise HTTPException(403, "El archivo no es accesible. Asegúrate de que esté compartido como 'Cualquiera con el enlace puede ver'.")
+            if resp.status_code != 200:
+                raise HTTPException(400, f"No se pudo descargar el archivo ({resp.status_code}).")
+            content_type = resp.headers.get("content-type", "")
+            if "pdf" in content_type or url.lower().endswith(".pdf"):
+                try:
+                    text = _pdf_bytes_to_text(resp.content)
+                except Exception as e:
+                    raise HTTPException(500, f"No se pudo leer el PDF: {e}")
+                return {"text": text}
+            # Plain text fallback
+            return {"text": resp.text.strip()}

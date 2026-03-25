@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useSession } from "next-auth/react";
 import { api, type Template } from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 
@@ -29,7 +28,6 @@ const EMPTY_EDITOR: EditorState = {
 
 export default function TemplatesPage() {
   const { t } = useI18n();
-  const { data: session } = useSession();
   const [templates, setTemplates] = useState<Template[]>([]);
   const [loading, setLoading] = useState(true);
   const [editor, setEditor] = useState<EditorState | null>(null);
@@ -77,15 +75,10 @@ export default function TemplatesPage() {
   // --- Drive extraction ---
   const handleDriveExtract = async () => {
     if (!editor?.driveUrl.trim()) return;
-    const token = (session as Record<string, unknown> | null)?.google_access_token as string | null;
-    if (!token) {
-      set({ extractError: "Cierra sesión y vuelve a entrar para activar el acceso a Drive." });
-      return;
-    }
     set({ extracting: true, extractError: "" });
     try {
-      const { text, filename } = await api.extractFromDrive(editor.driveUrl.trim(), token);
-      set({ content: text, name: editor.name || filename || "", extracting: false });
+      const { text } = await api.extractFromDrive(editor.driveUrl.trim());
+      set({ content: text, extracting: false });
     } catch (e) {
       set({ extractError: e instanceof Error ? e.message : "Error", extracting: false });
     }
@@ -273,11 +266,9 @@ export default function TemplatesPage() {
                     )}
                     {editor.extracting ? "Extrayendo..." : "Extraer contenido"}
                   </button>
-                  {!(session as Record<string, unknown> | null)?.google_access_token && (
-                    <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                      Para usar Drive, cierra sesión y vuelve a entrar — solo se necesita una vez.
-                    </p>
-                  )}
+                  <p className="text-xs text-gray-400">
+                    El archivo debe estar compartido como &ldquo;Cualquiera con el enlace puede ver&rdquo;.
+                  </p>
                 </div>
               )}
 

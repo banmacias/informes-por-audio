@@ -148,10 +148,10 @@ export const api = {
     return res.json() as Promise<{ text: string; filename: string }>;
   },
 
-  extractFromDrive: (url: string, accessToken: string) =>
-    request<{ text: string; filename: string }>("/api/templates/from-drive", {
+  extractFromDrive: (url: string) =>
+    request<{ text: string }>("/api/templates/from-drive", {
       method: "POST",
-      body: JSON.stringify({ url, access_token: accessToken }),
+      body: JSON.stringify({ url }),
     }),
 
   // Reports
